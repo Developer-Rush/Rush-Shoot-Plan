@@ -197,7 +197,7 @@ class ReelSerializer(ShootPlanChildSerializer):
     # model (added for per-assignment Role) -- declare it explicitly so
     # PATCHing assigned_freelancers (the existing "+Select freelancer" flow)
     # keeps working exactly as it did before Role was added.
-    assigned_freelancers = serializers.PrimaryKeyRelatedField(many=True, queryset=CrewMember.objects.all())
+    assigned_freelancers = serializers.PrimaryKeyRelatedField(many=True, queryset=CrewMember.objects.all(), required=False)
     assigned_model_names = serializers.SerializerMethodField()
     assigned_freelancer_names = serializers.SerializerMethodField()
     assigned_location_names = serializers.SerializerMethodField()
@@ -288,7 +288,7 @@ class PhotoSerializer(ShootPlanChildSerializer):
     # See ReelSerializer.assigned_freelancers -- DRF auto-marks an M2M field
     # read-only once it has a custom `through` model, so it must be declared
     # explicitly to stay writable.
-    assigned_freelancers = serializers.PrimaryKeyRelatedField(many=True, queryset=CrewMember.objects.all())
+    assigned_freelancers = serializers.PrimaryKeyRelatedField(many=True, queryset=CrewMember.objects.all(), required=False)
     assigned_model_names = serializers.SerializerMethodField()
     assigned_freelancer_names = serializers.SerializerMethodField()
     assigned_location_names = serializers.SerializerMethodField()
