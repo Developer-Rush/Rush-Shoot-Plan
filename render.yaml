@@ -16,7 +16,7 @@ services:
         value: ".onrender.com"
       - key: DATABASE_URL
         fromDatabase:
-          name: rush-republic-db
+          name: rush-republic-db-2026
           property: connectionString
       - key: CORS_ORIGIN
         sync: false  # set after first deploy: the frontend service's URL, e.g. https://rush-republic-frontend.onrender.com
@@ -40,7 +40,7 @@ services:
         destination: /index.html
 
 databases:
-  - name: rush-republic-db
+  - name: rush-republic-db-2026
     plan: free
     databaseName: rush_republic
     user: rush_republic_user
