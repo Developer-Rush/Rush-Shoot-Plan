@@ -217,8 +217,12 @@ class ReelViewSet(ShootPlanChildViewSet):
         errors = {}
         if not reel.title.strip():
             errors['title'] = ['Reel title is required before submitting.']
-        if not reel.concept.strip():
-            errors['concept'] = ['Script is required before submitting.']
+        # The wizard collects the script as per-scene rows (ReelScene), not
+        # the legacy free-text `concept` field -- so "has a script" means "has
+        # at least one non-blank scene", matching what the Reels step itself
+        # already treats as "complete" (see StepReels.js's `complete` prop).
+        if not reel.scenes.exclude(content='').exists():
+            errors['scenes'] = ['At least one scene with content is required before submitting.']
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
