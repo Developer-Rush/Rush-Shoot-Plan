@@ -40,6 +40,10 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    # Media (uploaded images) storage -- only actually used when
+    # CLOUDINARY_URL is set (see STORAGES below); harmless to always list.
+    'cloudinary_storage',
+    'cloudinary',
 
     # local
     'users',
@@ -137,24 +141,26 @@ STATIC_URL = 'static/'
 # `collectstatic` (run at deploy time, see Render build command) gathers
 # everything here; WhiteNoise serves it straight from gunicorn in production.
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+# ---------------------------------------------------------------------------
+# Media (uploaded brand logos, team/freelancer/model photos)
+#
+# Render's disk is NOT persistent across deploys/restarts for a web service
+# -- anything saved to local disk is lost on the next deploy. So uploads go
+# to Cloudinary instead, whenever CLOUDINARY_URL is set (production). Local
+# dev without a Cloudinary account falls back to plain local-disk storage
+# exactly as before.
+# ---------------------------------------------------------------------------
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 STORAGES = {
     'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
     'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
 }
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+if config('CLOUDINARY_URL', default=''):
+    STORAGES['default'] = {'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage'}
 
-# ---------------------------------------------------------------------------
-# Media (uploaded brand logos, team/freelancer/model photos)
-#
-# NOTE for deployment: this is local-disk storage. Render's filesystem is
-# NOT persistent across deploys/restarts for a web service -- anything
-# uploaded here will be lost on the next deploy. Fine for local dev; for a
-# real production rollout, point this at object storage (e.g. Cloudinary,
-# AWS S3 via django-storages) instead. Not changed here since that requires
-# picking/paying for a provider -- flagging it rather than guessing for you.
-# ---------------------------------------------------------------------------
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ---------------------------------------------------------------------------
 # Django REST Framework
