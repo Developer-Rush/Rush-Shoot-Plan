@@ -1,0 +1,83 @@
+.rr-photogrid {
+  margin-bottom: 16px;
+}
+
+.rr-photogrid__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, .6);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.rr-photogrid__drop {
+  border: 1px dashed rgba(0, 0, 0, .25);
+  border-radius: 6px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  background: #f7f7f5;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, .55);
+  transition: border-color .15s, background .15s;
+}
+
+.rr-photogrid__drop--over {
+  border-color: #0e0e0e;
+  background: #efefec;
+}
+
+.rr-photogrid__drop input {
+  display: none;
+}
+
+.rr-photogrid__thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* The box adapts to whatever the image's own dimensions are (capped by a
+   max width/height so nothing blows out the layout) instead of forcing
+   every upload into one fixed shape -- a portrait image stays portrait, a
+   landscape one stays landscape, a square one stays square, with no
+   letterboxing/whitespace and no cropping. */
+.rr-photogrid__thumb {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #eee;
+  line-height: 0;
+}
+
+.rr-photogrid__thumb img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 240px;
+  max-height: 240px;
+  cursor: zoom-in;
+}
+
+.rr-photogrid__thumb--portrait img {
+  max-width: 220px;
+  max-height: 390px;
+}
+
+.rr-photogrid__thumb button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, .6);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  cursor: pointer;
+  line-height: 1;
+}

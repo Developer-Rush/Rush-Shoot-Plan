@@ -1,0 +1,746 @@
+from django.utils import timezone
+from rest_framework import serializers
+
+from users.models import Department
+
+from .models import (
+    ShootPlan,
+    Reel,
+    ReelScene,
+    ReelPhoto,
+    Photo,
+    PhotoBriefImage,
+    PhotoReferenceLink,
+    PlanModel,
+    PlanModelPhoto,
+    PlanLocation,
+    PlanLocationPhoto,
+    Prop,
+    PropPhoto,
+    TravelExpense,
+    CrewMember,
+    ReelFreelancerAssignment,
+    PhotoFreelancerAssignment,
+    BudgetItem,
+    ReviewApproval,
+    ActivityLog,
+    Feedback,
+)
+
+
+class ShootPlanChildSerializer(serializers.ModelSerializer):
+    """
+    Shared behaviour for every child of a ShootPlan.
+
+    Shoot Plans are shared data -- any authenticated user may attach records
+    to any plan, regardless of department.
+    """
+
+    department = serializers.ReadOnlyField()
+
+
+class ShootPlanGrandchildSerializer(serializers.ModelSerializer):
+    """
+    Shared behaviour for photo galleries / reference links attached to a
+    model booking, location, prop, reel, or photo brief -- one level below
+    ShootPlanChildSerializer. Subclasses set `parent_field` to the FK's name
+    (e.g. 'plan_model').
+    """
+
+    parent_field = None
+
+
+class PlanModelPhotoSerializer(ShootPlanGrandchildSerializer):
+    parent_field = 'plan_model'
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+
+    class Meta:
+        model = PlanModelPhoto
+        fields = ['id', 'plan_model', 'category', 'category_display', 'image', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class PlanModelSerializer(ShootPlanChildSerializer):
+    approval_status_display = serializers.CharField(source='get_approval_status_display', read_only=True)
+    directory_model_name = serializers.CharField(source='directory_model.name', read_only=True, default=None)
+    directory_model_age = serializers.IntegerField(source='directory_model.age', read_only=True, default=None)
+    directory_model_gender_display = serializers.CharField(
+        source='directory_model.get_gender_display', read_only=True, default=None
+    )
+    directory_model_height_cm = serializers.SerializerMethodField()
+    directory_model_weight_kg = serializers.SerializerMethodField()
+    directory_model_photo = serializers.ImageField(source='directory_model.photo', read_only=True, default=None)
+    directory_model_notes = serializers.CharField(source='directory_model.notes', read_only=True, default=None)
+    photos = PlanModelPhotoSerializer(many=True, read_only=True, source='photos_gallery')
+
+    class Meta:
+        model = PlanModel
+        fields = [
+            'id', 'shoot_plan', 'order', 'from_directory', 'directory_model', 'directory_model_name',
+            'directory_model_age', 'directory_model_gender_display', 'directory_model_photo', 'directory_model_notes',
+            'directory_model_height_cm', 'directory_model_weight_kg',
+            'name', 'country_code', 'phone', 'email', 'agency', 'alt_contact', 'negotiated_cost',
+            'notes', 'time_in', 'time_out', 'approval_status', 'approval_status_display',
+            'photos', 'department', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_directory_model_height_cm(self, obj):
+        return obj.directory_model.height_cm if obj.directory_model_id else None
+
+    def get_directory_model_weight_kg(self, obj):
+        return obj.directory_model.weight_kg if obj.directory_model_id else None
+
+
+class PlanLocationPhotoSerializer(ShootPlanGrandchildSerializer):
+    parent_field = 'plan_location'
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+
+    class Meta:
+        model = PlanLocationPhoto
+        fields = ['id', 'plan_location', 'category', 'category_display', 'image', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class PlanLocationSerializer(ShootPlanChildSerializer):
+    approval_status_display = serializers.CharField(source='get_approval_status_display', read_only=True)
+    permit_status_display = serializers.CharField(source='get_permit_status_display', read_only=True)
+    photos = PlanLocationPhotoSerializer(many=True, read_only=True, source='photos_gallery')
+
+    class Meta:
+        model = PlanLocation
+        fields = [
+            'id', 'shoot_plan', 'order', 'name', 'address', 'map_url',
+            'permit_status', 'permit_status_display', 'contact_name', 'contact_phone',
+            'access_notes', 'time_in', 'time_out', 'approval_status', 'approval_status_display',
+            'budget_cost', 'photos', 'department', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class PropPhotoSerializer(ShootPlanGrandchildSerializer):
+    parent_field = 'prop'
+    class Meta:
+        model = PropPhoto
+        fields = ['id', 'prop', 'image', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class PropSerializer(ShootPlanChildSerializer):
+    source_display = serializers.CharField(source='get_source_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    total_cost = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    photos = PropPhotoSerializer(many=True, read_only=True, source='photos_gallery')
+
+    class Meta:
+        model = Prop
+        fields = [
+            'id', 'shoot_plan', 'order', 'name', 'quantity', 'source', 'source_display',
+            'unit_cost', 'total_cost', 'notes', 'status', 'status_display',
+            'photos', 'department', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate(self, attrs):
+        quantity = attrs.get('quantity', getattr(self.instance, 'quantity', 1))
+        unit_cost = attrs.get('unit_cost', getattr(self.instance, 'unit_cost', 0))
+        if quantity is not None and quantity < 1:
+            raise serializers.ValidationError({'quantity': 'Quantity must be at least 1.'})
+        if unit_cost is not None and unit_cost < 0:
+            raise serializers.ValidationError({'unit_cost': 'Unit cost cannot be negative.'})
+        return attrs
+
+
+class ReelSceneSerializer(ShootPlanGrandchildSerializer):
+    parent_field = 'reel'
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = ReelScene
+        fields = ['id', 'reel', 'order', 'content', 'status', 'status_display', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class ReelPhotoSerializer(ShootPlanGrandchildSerializer):
+    parent_field = 'reel'
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+
+    class Meta:
+        model = ReelPhoto
+        fields = ['id', 'reel', 'category', 'category_display', 'image', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class ReelFreelancerAssignmentSerializer(ShootPlanGrandchildSerializer):
+    parent_field = 'reel'
+    crew_member_name = serializers.CharField(source='crew_member.name', read_only=True)
+    role_display = serializers.CharField(source='get_role_display', read_only=True)
+
+    class Meta:
+        model = ReelFreelancerAssignment
+        fields = ['id', 'reel', 'crew_member', 'crew_member_name', 'role', 'role_display', 'created_at']
+        read_only_fields = ['id', 'reel', 'crew_member', 'created_at']
+
+
+class ReelSerializer(ShootPlanChildSerializer):
+    platform_display = serializers.CharField(source='get_platform_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    approval_status_display = serializers.CharField(source='get_approval_status_display', read_only=True)
+    submitted_by_name = serializers.CharField(source='submitted_by.username', read_only=True, default=None)
+    approved_by_name = serializers.CharField(source='approved_by.username', read_only=True, default=None)
+    returned_by_name = serializers.CharField(source='returned_by.username', read_only=True, default=None)
+    approval_history = serializers.SerializerMethodField()
+    photos = ReelPhotoSerializer(many=True, read_only=True, source='photos_gallery')
+    scenes = ReelSceneSerializer(many=True, read_only=True)
+    freelancer_assignments = ReelFreelancerAssignmentSerializer(many=True, read_only=True)
+    # DRF auto-marks an M2M field read-only once it has a custom `through`
+    # model (added for per-assignment Role) -- declare it explicitly so
+    # PATCHing assigned_freelancers (the existing "+Select freelancer" flow)
+    # keeps working exactly as it did before Role was added.
+    assigned_freelancers = serializers.PrimaryKeyRelatedField(many=True, queryset=CrewMember.objects.all())
+    assigned_model_names = serializers.SerializerMethodField()
+    assigned_freelancer_names = serializers.SerializerMethodField()
+    assigned_location_names = serializers.SerializerMethodField()
+    assigned_prop_names = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Reel
+        fields = [
+            'id', 'shoot_plan', 'order', 'title', 'concept', 'reference_link', 'notes',
+            'photographer_notes', 'platform', 'platform_display', 'duration_seconds',
+            'status', 'status_display', 'assigned_to',
+            # Approval workflow -- all read-only here; only mutable through
+            # the dedicated submit/approve/return actions on ReelViewSet, so
+            # a normal PATCH/edit can never silently change or bypass it.
+            'approval_status', 'approval_status_display', 'suggestions',
+            'submitted_by', 'submitted_by_name', 'submitted_at',
+            'approved_by', 'approved_by_name', 'approved_at',
+            'returned_by', 'returned_by_name', 'returned_at',
+            'approval_history',
+            'assigned_models', 'assigned_model_names',
+            'assigned_freelancers', 'assigned_freelancer_names',
+            'assigned_locations', 'assigned_location_names',
+            'assigned_props', 'assigned_prop_names',
+            'photos', 'scenes', 'freelancer_assignments', 'department', 'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'created_at', 'updated_at',
+            'approval_status', 'suggestions',
+            'submitted_by', 'submitted_at', 'approved_by', 'approved_at', 'returned_by', 'returned_at',
+        ]
+
+    def get_approval_history(self, obj):
+        return ReviewApprovalSerializer(obj.approval_history.all(), many=True, context=self.context).data
+
+    def get_assigned_model_names(self, obj):
+        return [m.name for m in obj.assigned_models.all()]
+
+    def get_assigned_freelancer_names(self, obj):
+        return [f.name for f in obj.assigned_freelancers.all()]
+
+    def get_assigned_location_names(self, obj):
+        return [l.name for l in obj.assigned_locations.all()]
+
+    def get_assigned_prop_names(self, obj):
+        return [p.name for p in obj.assigned_props.all()]
+
+
+class PhotoBriefImageSerializer(ShootPlanGrandchildSerializer):
+    parent_field = 'photo'
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+
+    class Meta:
+        model = PhotoBriefImage
+        fields = ['id', 'photo', 'category', 'category_display', 'image', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class PhotoReferenceLinkSerializer(ShootPlanGrandchildSerializer):
+    parent_field = 'photo'
+    class Meta:
+        model = PhotoReferenceLink
+        fields = ['id', 'photo', 'url', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class PhotoFreelancerAssignmentSerializer(ShootPlanGrandchildSerializer):
+    parent_field = 'photo'
+    crew_member_name = serializers.CharField(source='crew_member.name', read_only=True)
+    role_display = serializers.CharField(source='get_role_display', read_only=True)
+
+    class Meta:
+        model = PhotoFreelancerAssignment
+        fields = ['id', 'photo', 'crew_member', 'crew_member_name', 'role', 'role_display', 'created_at']
+        read_only_fields = ['id', 'photo', 'crew_member', 'created_at']
+
+
+class PhotoSerializer(ShootPlanChildSerializer):
+    shot_type_display = serializers.CharField(source='get_shot_type_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    approval_status_display = serializers.CharField(source='get_approval_status_display', read_only=True)
+    submitted_by_name = serializers.CharField(source='submitted_by.username', read_only=True, default=None)
+    approved_by_name = serializers.CharField(source='approved_by.username', read_only=True, default=None)
+    returned_by_name = serializers.CharField(source='returned_by.username', read_only=True, default=None)
+    approval_history = serializers.SerializerMethodField()
+    photos = PhotoBriefImageSerializer(many=True, read_only=True, source='photos_gallery')
+    reference_links = PhotoReferenceLinkSerializer(many=True, read_only=True)
+    freelancer_assignments = PhotoFreelancerAssignmentSerializer(many=True, read_only=True)
+    # See ReelSerializer.assigned_freelancers -- DRF auto-marks an M2M field
+    # read-only once it has a custom `through` model, so it must be declared
+    # explicitly to stay writable.
+    assigned_freelancers = serializers.PrimaryKeyRelatedField(many=True, queryset=CrewMember.objects.all())
+    assigned_model_names = serializers.SerializerMethodField()
+    assigned_freelancer_names = serializers.SerializerMethodField()
+    assigned_location_names = serializers.SerializerMethodField()
+    assigned_prop_names = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Photo
+        fields = [
+            'id', 'shoot_plan', 'order', 'title', 'shot_type', 'shot_type_display',
+            'quantity', 'description', 'notes_to_designer', 'status', 'status_display',
+            'reference_link', 'reference_links',
+            # Approval workflow -- all read-only here; only mutable through
+            # the dedicated submit/approve/return actions on PhotoViewSet, so
+            # a normal PATCH/edit can never silently change or bypass it.
+            'approval_status', 'approval_status_display', 'suggestions',
+            'submitted_by', 'submitted_by_name', 'submitted_at',
+            'approved_by', 'approved_by_name', 'approved_at',
+            'returned_by', 'returned_by_name', 'returned_at',
+            'approval_history',
+            'assigned_models', 'assigned_model_names',
+            'assigned_freelancers', 'assigned_freelancer_names',
+            'assigned_locations', 'assigned_location_names',
+            'assigned_props', 'assigned_prop_names',
+            'photos', 'freelancer_assignments', 'department', 'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'created_at', 'updated_at',
+            'approval_status', 'suggestions',
+            'submitted_by', 'submitted_at', 'approved_by', 'approved_at', 'returned_by', 'returned_at',
+        ]
+
+    def get_assigned_model_names(self, obj):
+        return [m.name for m in obj.assigned_models.all()]
+
+    def get_assigned_freelancer_names(self, obj):
+        return [f.name for f in obj.assigned_freelancers.all()]
+
+    def get_assigned_location_names(self, obj):
+        return [l.name for l in obj.assigned_locations.all()]
+
+    def get_assigned_prop_names(self, obj):
+        return [p.name for p in obj.assigned_props.all()]
+
+    def get_approval_history(self, obj):
+        return ReviewApprovalSerializer(obj.approval_history.all(), many=True, context=self.context).data
+
+
+class TravelExpenseSerializer(ShootPlanChildSerializer):
+    expense_type_display = serializers.CharField(source='get_expense_type_display', read_only=True)
+
+    class Meta:
+        model = TravelExpense
+        fields = [
+            'id', 'shoot_plan', 'reason', 'expense_type', 'expense_type_display',
+            'cost', 'notes', 'department', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class CrewMemberSerializer(ShootPlanChildSerializer):
+    role_display = serializers.CharField(source='get_role_display', read_only=True)
+    person_type_display = serializers.CharField(source='get_person_type_display', read_only=True)
+
+    class Meta:
+        model = CrewMember
+        fields = [
+            'id', 'shoot_plan', 'name', 'role', 'role_display', 'person_type', 'person_type_display',
+            'contact', 'call_time', 'time_out', 'day_rate', 'notes',
+            'source_freelancer', 'source_plan_model', 'source_brand_role',
+            'meal_included', 'meal_cost', 'meals_count',
+            'department', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class BudgetItemSerializer(ShootPlanChildSerializer):
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    remaining_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = BudgetItem
+        fields = [
+            'id', 'shoot_plan', 'category', 'category_display', 'description',
+            'allocated_amount', 'spent_amount', 'remaining_amount',
+            'department', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate(self, attrs):
+        allocated = attrs.get(
+            'allocated_amount',
+            getattr(self.instance, 'allocated_amount', 0),
+        )
+        spent = attrs.get('spent_amount', getattr(self.instance, 'spent_amount', 0))
+        if allocated < 0 or spent < 0:
+            raise serializers.ValidationError('Budget amounts cannot be negative.')
+        return attrs
+
+
+class ReviewApprovalSerializer(ShootPlanChildSerializer):
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    reviewer_name = serializers.CharField(source='reviewer.username', read_only=True, default=None)
+    # `department` on ShootPlanChild is a plain property (delegates to the
+    # parent plan), not a choices field, so there's no auto get_*_display().
+    department_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ReviewApproval
+        fields = [
+            'id', 'shoot_plan', 'reel', 'photo', 'status', 'status_display', 'remarks',
+            'reviewer', 'reviewer_name', 'reviewed_at', 'department', 'department_display',
+            'created_at', 'updated_at',
+        ]
+        # `reel`/`photo` are read-only here on purpose -- a reel/photo-scoped
+        # review row (and the matching approval_status change) may only ever
+        # be created by ReelViewSet/PhotoViewSet's submit/approve/return
+        # actions, which enforce the Admin/Production-Head-only rule.
+        # Allowing them through this generic endpoint would let any
+        # authenticated user self-approve their own reel/shot.
+        read_only_fields = [
+            'id', 'reel', 'photo', 'reviewer', 'reviewer_name', 'reviewed_at', 'created_at', 'updated_at',
+        ]
+
+    def get_department_display(self, obj):
+        return obj.shoot_plan.get_department_display()
+
+    def create(self, validated_data):
+        validated_data['reviewer'] = self.context['request'].user
+        if validated_data.get('status') != ReviewApproval.Status.PENDING:
+            validated_data['reviewed_at'] = timezone.now()
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        new_status = validated_data.get('status', instance.status)
+        if new_status != ReviewApproval.Status.PENDING and instance.reviewed_at is None:
+            validated_data['reviewed_at'] = timezone.now()
+        validated_data['reviewer'] = self.context['request'].user
+        return super().update(instance, validated_data)
+
+
+class ActivityLogSerializer(serializers.ModelSerializer):
+    actor_name = serializers.CharField(source='actor.username', read_only=True, default='System')
+    department_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ActivityLog
+        fields = ['id', 'shoot_plan', 'title', 'actor', 'actor_name', 'department_display', 'created_at']
+        read_only_fields = fields
+
+    def get_department_display(self, obj):
+        return obj.shoot_plan.get_department_display() if obj.actor_id else 'System'
+
+
+class FeedbackSerializer(serializers.ModelSerializer):
+    """
+    Feedback is stamped with the author and their department server-side, so a
+    user cannot file feedback in another department's name.
+    """
+
+    author_name = serializers.CharField(source='author.username', read_only=True)
+    author_email = serializers.CharField(source='author.email', read_only=True)
+    department_display = serializers.CharField(source='get_department_display', read_only=True)
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    shoot_plan_title = serializers.CharField(source='shoot_plan.title', read_only=True, default=None)
+    can_edit = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Feedback
+        fields = [
+            'id', 'shoot_plan', 'shoot_plan_title', 'department', 'department_display',
+            'author', 'author_name', 'author_email', 'subject', 'message',
+            'category', 'category_display', 'rating', 'status', 'status_display',
+            'admin_response', 'can_edit', 'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'department', 'author', 'author_name', 'author_email',
+            'created_at', 'updated_at',
+        ]
+
+    def get_can_edit(self, obj):
+        user = self.context['request'].user
+        return user.is_elevated or obj.author_id == user.id
+
+    def validate_subject(self, value):
+        if not value.strip():
+            raise serializers.ValidationError('Subject cannot be empty.')
+        return value.strip()
+
+    def validate_message(self, value):
+        if len(value.strip()) < 5:
+            raise serializers.ValidationError('Feedback message must be at least 5 characters.')
+        return value.strip()
+
+    def validate(self, attrs):
+        user = self.context['request'].user
+        # Only Admin may write an admin_response or move feedback out of OPEN
+        # -- otherwise an author could close out their own complaint before
+        # anyone reviews it.
+        if not user.is_elevated and attrs.get('admin_response'):
+            raise serializers.ValidationError(
+                {'admin_response': 'Only Admin can write an admin response.'}
+            )
+        if not user.is_elevated and attrs.get('status', Feedback.Status.OPEN) != Feedback.Status.OPEN:
+            raise serializers.ValidationError(
+                {'status': 'Only Admin can change feedback status.'}
+            )
+        return attrs
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        validated_data['author'] = user
+        # Admin filing feedback on a plan inherits that plan's department so the
+        # owning team can still see it; otherwise it lands in the author's own.
+        plan = validated_data.get('shoot_plan')
+        if user.is_elevated and plan is not None:
+            validated_data['department'] = plan.department
+        else:
+            validated_data['department'] = user.department
+        return super().create(validated_data)
+
+
+# Human-readable Activity Timeline entries for a status transition, plus who
+# gets notified (if anyone) -- mirrors the frontend's PRIMARY_ACTION map.
+#
+# The active workflow is DRAFT -> PRODUCTION_REVIEW -> APPROVED -> SHOOT_COMPLETED
+# -> ARCHIVED. Creative Review is retired; ('CREATIVE_REVIEW', 'APPROVED') stays
+# mapped only as the legacy exit for a pre-existing record still parked there
+# (see validate_status below) -- no new plan can enter CREATIVE_REVIEW again.
+STATUS_TRANSITION_TITLES = {
+    ('DRAFT', 'PRODUCTION_REVIEW'): 'Submitted for Production Review',
+    ('RETURNED_FOR_CHANGES', 'PRODUCTION_REVIEW'): 'Resubmitted for Production Review',
+    ('PRODUCTION_REVIEW', 'APPROVED'): 'Approved by Production Head',
+    ('CREATIVE_REVIEW', 'APPROVED'): 'Approved by Production Head',
+    ('ON_HOLD', 'PRODUCTION_REVIEW'): 'Review resumed',
+    ('APPROVED', 'SHOOT_COMPLETED'): 'Shoot marked completed',
+    ('SHOOT_COMPLETED', 'ARCHIVED'): 'Shoot plan archived',
+}
+def _log_status_transition(shoot_plan, old_status, new_status, actor):
+    if old_status == new_status:
+        return
+    if new_status == 'ON_HOLD':
+        title = 'Put on hold'
+    elif new_status == 'RETURNED_FOR_CHANGES':
+        title = 'Returned for changes'
+    else:
+        title = STATUS_TRANSITION_TITLES.get(
+            (old_status, new_status), f'Status changed to {shoot_plan.get_status_display()}'
+        )
+    ActivityLog.objects.create(shoot_plan=shoot_plan, title=title, actor=actor)
+
+
+class ShootPlanListSerializer(serializers.ModelSerializer):
+    """Lean payload for the shoot plan index table."""
+
+    department_display = serializers.CharField(source='get_department_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, default=None)
+    brand_name = serializers.CharField(source='brand.name', read_only=True, default=None)
+    brand_logo = serializers.ImageField(source='brand.logo', read_only=True, default=None)
+    brand_palette = serializers.ImageField(source='brand.palette', read_only=True, default=None)
+    brand_script_writer = serializers.CharField(source='brand.script_writer.name', read_only=True, default=None)
+    brand_social_media_specialist = serializers.CharField(
+        source='brand.social_media_specialist.name', read_only=True, default=None
+    )
+    brand_client_servicing = serializers.CharField(
+        source='brand.client_servicing.name', read_only=True, default=None
+    )
+    brand_production_coordinator = serializers.CharField(
+        source='brand.production_coordinator.name', read_only=True, default=None
+    )
+    brand_production_head = serializers.CharField(
+        source='brand.production_head.name', read_only=True, default=None
+    )
+    reel_count = serializers.IntegerField(read_only=True)
+    photo_count = serializers.IntegerField(read_only=True)
+    crew_count = serializers.IntegerField(read_only=True)
+    feedback_count = serializers.IntegerField(read_only=True)
+    budget_allocated = serializers.SerializerMethodField()
+    budget_spent = serializers.SerializerMethodField()
+    latest_review_status = serializers.SerializerMethodField()
+    completion_percent = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ShootPlan
+        fields = [
+            'id', 'title', 'client_name', 'brand', 'brand_name', 'brand_logo', 'brand_palette',
+            'brand_script_writer', 'brand_social_media_specialist',
+            'brand_client_servicing', 'brand_production_coordinator', 'brand_production_head',
+            'department', 'department_display',
+            'status', 'status_display', 'completion_percent', 'location',
+            'shoot_date', 'call_time', 'wrap_time', 'brief', 'created_by',
+            'created_by_name', 'reel_count', 'photo_count', 'crew_count',
+            'feedback_count', 'budget_allocated', 'budget_spent',
+            'latest_review_status', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
+
+    def get_budget_allocated(self, obj):
+        return float(sum(item.allocated_amount for item in obj.budget_items.all()))
+
+    def get_budget_spent(self, obj):
+        return float(sum(item.spent_amount for item in obj.budget_items.all()))
+
+    def get_latest_review_status(self, obj):
+        review = obj.reviews.all().first()
+        return review.status if review else None
+
+    def get_completion_percent(self, obj):
+        """
+        Real (completed required fields / total required fields) x 100 --
+        NOT "does at least one reel/photo/etc exist". A plan with one mostly-
+        empty reel must not score the same as one with a fully-briefed reel;
+        a plan with 3 reels where only 1 is finished must not read as "done"
+        just because `reels.exists()` is True.
+
+        Required fields, matching exactly what the wizard itself marks
+        required (the `*` markers in StepShootDetails.js/StepReels.js/
+        StepPhotos.js) -- nothing here is invented:
+          - Shoot Details: title, shoot_date, brand            (3 fixed slots)
+          - Each Reel:      title, concept ("Script")           (2 slots/reel)
+          - Each Photo:     description ("Shot description")    (1 slot/shot)
+          - Crew / Budget / Feedback: no per-field requirement in the UI --
+            kept as a single "at least one record exists" slot each, same as
+            before, since there's no finer-grained required field to check.
+        A plan with zero reels (or zero photos) still contributes that
+        section's slots as incomplete rather than dropping out of the
+        denominator entirely -- otherwise a plan that never gets any reels
+        could reach 100% without ever being briefed, which defeats the point.
+        """
+        def count(field):
+            annotated = getattr(obj, f'{field}_count', None)
+            return annotated if annotated is not None else getattr(obj, field).count()
+
+        def filled(value):
+            return bool(value and str(value).strip())
+
+        completed = 0
+        total = 0
+
+        # Shoot Details
+        for value in (obj.title, obj.shoot_date, obj.brand_id):
+            total += 1
+            completed += filled(value)
+
+        # Reels -- every existing reel's required fields, or one empty
+        # "virtual" reel's worth of slots if none exist yet.
+        reels = list(obj.reels.all())
+        for reel in (reels or [None]):
+            total += 2
+            if reel is not None:
+                completed += filled(reel.title) + filled(reel.concept)
+
+        # Photos/Shots -- same pattern, one required field each.
+        photos = list(obj.photos.all())
+        for photo in (photos or [None]):
+            total += 1
+            if photo is not None:
+                completed += filled(photo.description)
+
+        # Crew / Budget / Feedback -- "at least one record" slots.
+        total += 3
+        completed += count('crew') > 0
+        completed += (count('budget_items') > 0 or count('travel_expenses') > 0)
+        completed += count('feedback') > 0
+
+        return round(completed / total * 100) if total else 0
+
+    def validate_department(self, value):
+        """
+        `department` is just which interface a plan was created under --
+        shoot plans are shared data, so any user may set it to any
+        department. Only the value itself needs to be valid.
+        """
+        if value not in Department.values:
+            raise serializers.ValidationError('Select a valid department.')
+        return value
+
+    def validate_status(self, value):
+        """
+        Server-side enforcement of the two workflow rules the frontend also
+        follows -- a hand-crafted API request must not be able to bypass
+        either one.
+        """
+        old_status = self.instance.status if self.instance else None
+        if value == ShootPlan.Status.CREATIVE_REVIEW and old_status != ShootPlan.Status.CREATIVE_REVIEW:
+            raise serializers.ValidationError(
+                'Creative Review has been retired from the approval workflow.'
+            )
+        if value == ShootPlan.Status.SHOOT_COMPLETED and old_status != ShootPlan.Status.SHOOT_COMPLETED:
+            if not self.instance or not self.instance.feedback.exists():
+                raise serializers.ValidationError(
+                    'Add at least one piece of feedback before marking this shoot completed.'
+                )
+        return value
+
+    def _sync_client_name_from_brand(self, validated_data):
+        """When a Brand is linked, client_name always mirrors it."""
+        brand = validated_data.get('brand')
+        if brand is not None:
+            validated_data['client_name'] = brand.name
+
+    def validate(self, attrs):
+        """Every plan needs a display name -- either a linked Brand or a typed client_name."""
+        brand = attrs.get('brand', getattr(self.instance, 'brand', None))
+        client_name = attrs.get('client_name', getattr(self.instance, 'client_name', ''))
+        if not brand and not client_name:
+            raise serializers.ValidationError(
+                {'client_name': 'Select a brand or enter a client/brand name.'}
+            )
+        return attrs
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        validated_data['created_by'] = user
+        validated_data.setdefault('department', user.department)
+        self._sync_client_name_from_brand(validated_data)
+        instance = super().create(validated_data)
+        ActivityLog.objects.create(shoot_plan=instance, title='Shoot plan created', actor=user)
+        return instance
+
+    def update(self, instance, validated_data):
+        old_status = instance.status
+        self._sync_client_name_from_brand(validated_data)
+        instance = super().update(instance, validated_data)
+        new_status = validated_data.get('status', old_status)
+        _log_status_transition(instance, old_status, new_status, self.context['request'].user)
+        return instance
+
+
+class ShootPlanDetailSerializer(ShootPlanListSerializer):
+    """Full payload -- every category nested, so the detail page is one request."""
+
+    plan_models = PlanModelSerializer(many=True, read_only=True)
+    plan_locations = PlanLocationSerializer(many=True, read_only=True)
+    props = PropSerializer(many=True, read_only=True)
+    reels = ReelSerializer(many=True, read_only=True)
+    photos = PhotoSerializer(many=True, read_only=True)
+    crew = CrewMemberSerializer(many=True, read_only=True)
+    budget_items = BudgetItemSerializer(many=True, read_only=True)
+    travel_expenses = TravelExpenseSerializer(many=True, read_only=True)
+    reviews = ReviewApprovalSerializer(many=True, read_only=True)
+    activity_log = ActivityLogSerializer(many=True, read_only=True)
+    feedback = serializers.SerializerMethodField()
+
+    class Meta(ShootPlanListSerializer.Meta):
+        fields = ShootPlanListSerializer.Meta.fields + [
+            'client_notified', 'models_notified', 'locations_notified', 'print_previewed_at',
+            'plan_models', 'plan_locations', 'props',
+            'reels', 'photos', 'crew', 'budget_items', 'travel_expenses', 'reviews', 'activity_log', 'feedback',
+        ]
+
+    def get_feedback(self, obj):
+        """Feedback is shared data too -- every department sees all of it on a plan."""
+        return FeedbackSerializer(obj.feedback.all(), many=True, context=self.context).data

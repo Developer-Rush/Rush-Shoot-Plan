@@ -1,0 +1,47 @@
+.rr-richtext {
+  width: 100%;
+  max-height: 320px;
+  border: 1px solid rgba(0, 0, 0, .15);
+  border-radius: 5px;
+  padding: 9px 10px;
+  font-size: 14px;
+  font-family: inherit;
+  box-sizing: border-box;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  outline: none;
+}
+
+.rr-richtext:focus {
+  border-color: rgba(0, 0, 0, .35);
+}
+
+.rr-richtext:empty:before {
+  content: attr(data-placeholder);
+  color: rgba(0, 0, 0, .35);
+}
+
+.rr-richtext ul,
+.rr-richtext ol {
+  margin: 0 0 0 1.2em;
+  padding: 0;
+}
+
+/* Pasted headings/paragraphs (Word/Docs) carry large default margins and
+   line-heights that -- even with font-size clamped in utils/richText.js --
+   can still bloat this compact field far past the rest of the form. Reset
+   them to something proportionate; the heading's relative size/weight
+   (still bigger/bolder than body text) is preserved either way. */
+.rr-richtext h1,
+.rr-richtext h2,
+.rr-richtext h3,
+.rr-richtext h4,
+.rr-richtext h5,
+.rr-richtext h6,
+.rr-richtext p,
+.rr-richtext div,
+.rr-richtext blockquote {
+  margin: 0 0 6px;
+  line-height: 1.4;
+}
