@@ -13,5 +13,7 @@ urlpatterns = [
     path('api/', include('directory.urls')),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Served unconditionally (not just when DEBUG=True) -- the free-tier Render
+# deployment has no separate media server/CDN in front of it, so Django must
+# serve uploaded files itself in production too, or every image URL 404s.
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
