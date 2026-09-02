@@ -635,12 +635,15 @@ class ShootPlanListSerializer(serializers.ModelSerializer):
             completed += filled(value)
 
         # Reels -- every existing reel's required fields, or one empty
-        # "virtual" reel's worth of slots if none exist yet.
+        # "virtual" reel's worth of slots if none exist yet. The script is
+        # collected as per-scene rows (ReelScene), not the legacy concept
+        # field -- see ReelViewSet.submit for the same fix.
         reels = list(obj.reels.all())
         for reel in (reels or [None]):
             total += 2
             if reel is not None:
-                completed += filled(reel.title) + filled(reel.concept)
+                has_script = any(filled(s.content) for s in reel.scenes.all())
+                completed += filled(reel.title) + has_script
 
         # Photos/Shots -- same pattern, one required field each.
         photos = list(obj.photos.all())
