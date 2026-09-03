@@ -31,7 +31,7 @@ export function formatDate(value) {
   return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-/** ISO timestamp -> `21 Aug 2026, 14:32` */
+/** ISO timestamp -> `21 Aug 2026, 02:32 PM` */
 export function formatDateTime(value) {
   if (!value) return '—';
   const date = new Date(value);
@@ -40,7 +40,7 @@ export function formatDateTime(value) {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
-  })}, ${date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+  })}, ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
 }
 
 /** ISO timestamp -> `20 Jun 09:05 AM` -- used on the Activity Timeline */

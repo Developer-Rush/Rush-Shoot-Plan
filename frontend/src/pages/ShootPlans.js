@@ -4,7 +4,7 @@ import AppShell from '../components/AppShell';
 import { ErrorAlert, LoadingState } from '../components/EmptyState';
 import { shootPlanService, brandService, extractApiError } from '../api/services';
 import { SHOOT_STATUS_ORDER, statusMeta } from '../constants/statusMeta';
-import { formatDate, formatTime, timeAgo } from '../utils/format';
+import { formatDate, formatTime12, timeAgo } from '../utils/format';
 import './Directory.css';
 import './ShootPlans.css';
 
@@ -179,7 +179,7 @@ export default function ShootPlans() {
 
                   <div className="rr-plan-card__meta">
                     {formatDate(plan.shoot_date)}
-                    {plan.call_time && plan.wrap_time ? ` · ${formatTime(plan.call_time)}–${formatTime(plan.wrap_time)}` : ''}
+                    {plan.call_time && plan.wrap_time ? ` · ${formatTime12(plan.call_time)}–${formatTime12(plan.wrap_time)}` : ''}
                   </div>
 
                   {plan.created_by_name && (

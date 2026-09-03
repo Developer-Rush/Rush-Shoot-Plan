@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatDate, formatTime } from '../../utils/format';
+import { formatDate, formatTime12 } from '../../utils/format';
 import { sanitizeRichText } from '../../utils/richText';
 import SafeLink from '../../components/SafeLink';
 import logo from '../../assets/rush-republic-logo.png';
@@ -70,7 +70,7 @@ export function ShootDetailsSection({ plan }) {
             <span className="field-label">Date &amp; time</span>
             <b>
               {formatDate(plan?.shoot_date)}
-              {plan?.call_time && plan?.wrap_time ? ` · ${formatTime(plan.call_time)}–${formatTime(plan.wrap_time)}` : ''}
+              {plan?.call_time && plan?.wrap_time ? ` · ${formatTime12(plan.call_time)}–${formatTime12(plan.wrap_time)}` : ''}
             </b>
           </div>
         </div>
