@@ -34,7 +34,7 @@ export default function StepPrintDetails({ plan, onChanged }) {
 
   return (
     <>
-      <div className="rr-wiz-step-title">Print Details</div>
+      <div className="rr-wiz-step-title rr-print-hide">Print Details</div>
       <div className="rr-print-hide" style={{ fontSize: 13, color: 'rgba(0,0,0,.55)', marginBottom: 20 }}>
         A complete, print-ready snapshot of Shoot Details, Reels, and Photos — always reflects the current
         saved data for this plan, including every uploaded image, moodboard, storyboard, and color palette.
