@@ -355,17 +355,20 @@ export function PrintReelsFull({ plan }) {
               </div>
             </div>
             {(r.scenes || []).length > 0 ? (
-              (r.scenes || []).map((s, sceneIdx) => (
-                <div className="rr-note-block" key={s.id}>
-                  <div className="rr-note-block__label">
-                    {`Scene ${sceneIdx + 1}`}{' '}
-                    <span style={{ color: s.status === 'COMPLETED' ? '#177a4c' : '#b3213f', fontWeight: 700 }}>
-                      {s.status === 'COMPLETED' ? '✓ Completed' : '✓ Pending'}
-                    </span>
+              <>
+                <div className="rr-note-block__label" style={{ marginTop: 10 }}>Script</div>
+                {(r.scenes || []).map((s, sceneIdx) => (
+                  <div className="rr-note-block" key={s.id}>
+                    <div className="rr-note-block__label">
+                      {`Scene ${sceneIdx + 1}`}{' '}
+                      <span style={{ color: s.status === 'COMPLETED' ? '#177a4c' : '#b3213f', fontWeight: 700 }}>
+                        {s.status === 'COMPLETED' ? '✓ Completed' : '✓ Pending'}
+                      </span>
+                    </div>
+                    <div className="rr-note-block__value" dangerouslySetInnerHTML={{ __html: sanitizeRichText(s.content) }} />
                   </div>
-                  <div className="rr-note-block__value" dangerouslySetInnerHTML={{ __html: sanitizeRichText(s.content) }} />
-                </div>
-              ))
+                ))}
+              </>
             ) : (
               <NoteBlock label="Script" value={r.concept} />
             )}
