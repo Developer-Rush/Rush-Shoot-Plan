@@ -329,7 +329,18 @@ export default function ShootPlanWizard({ create = false }) {
                 </button>
               </div>
               {nextStep && (
-                <button type="button" className="rr-toggle-btn rr-toggle-btn--active" onClick={() => setActiveStep(nextStep.key)}>
+                <button
+                  type="button"
+                  className="rr-toggle-btn rr-toggle-btn--active"
+                  onClick={() => {
+                    // The wizard swaps step content in place (no real page
+                    // navigation), so without this the browser keeps
+                    // whatever scroll offset it was at -- landing mid-way or
+                    // at the bottom of the next section instead of its top.
+                    setActiveStep(nextStep.key);
+                    window.scrollTo({ top: 0 });
+                  }}
+                >
                   Next → {nextStep.label}
                 </button>
               )}
