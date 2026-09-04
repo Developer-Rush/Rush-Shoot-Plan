@@ -140,7 +140,11 @@ export const CATEGORY_SERVICES = {
 // ---------------------------------------------------------------------------
 // Directory: Team, Freelancers, Models, Brands
 // ---------------------------------------------------------------------------
-export const teamService = crud('team');
+export const teamService = {
+  ...crud('team'),
+  resetPassword: (id, newPassword) =>
+    api.post(`/team/${id}/reset_password/`, { new_password: newPassword }).then((r) => r.data),
+};
 export const freelancerService = crud('freelancers');
 export const modelService = crud('models');
 

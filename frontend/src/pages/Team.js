@@ -3,6 +3,8 @@ import AppShell from '../components/AppShell';
 import Drawer from '../components/Drawer';
 import { teamService, extractApiError, extractFieldErrors } from '../api/services';
 import { TEAM_ROLE_OPTIONS, BRANCH_OPTIONS } from '../constants/directoryOptions';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import './Directory.css';
 
 const EMPTY_FORM = { name: '', role: '', branch: 'KOCHI', mobile: '', email: '' };
@@ -17,6 +19,8 @@ function initials(name) {
 }
 
 export default function Team() {
+  const { isAdmin } = useAuth();
+  const { showToast } = useToast();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -32,6 +36,10 @@ export default function Team() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+  // Admin-only, kept separate from `form` -- this goes through its own
+  // reset_password endpoint (users.CustomUser), not the regular Team Member
+  // PATCH, since a TeamMember row has no password of its own.
+  const [newPassword, setNewPassword] = useState('');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -56,6 +64,7 @@ export default function Team() {
     setForm(EMPTY_FORM);
     setFieldErrors({});
     setFormError('');
+    setNewPassword('');
     setDrawerOpen(true);
   };
 
@@ -70,6 +79,7 @@ export default function Team() {
     });
     setFieldErrors({});
     setFormError('');
+    setNewPassword('');
     setDrawerOpen(true);
   };
 
@@ -85,8 +95,6 @@ export default function Team() {
       } else {
         await teamService.create(form);
       }
-      setDrawerOpen(false);
-      load();
     } catch (err) {
       const flattened = extractFieldErrors(err);
       if (Object.keys(flattened).length) {
@@ -95,9 +103,27 @@ export default function Team() {
       } else {
         setFormError(extractApiError(err, 'Could not save this team member.'));
       }
-    } finally {
       setSaving(false);
+      return;
     }
+
+    // Team Member details saved successfully. If an admin also entered a
+    // new password, reset it as a second step -- a failure here shouldn't
+    // hide that the details above already saved.
+    if (isAdmin && editing && newPassword) {
+      try {
+        await teamService.resetPassword(editing.id, newPassword);
+        showToast('Password reset successfully.');
+      } catch (err) {
+        setFormError(extractApiError(err, 'Unable to reset password. Please try again.'));
+        setSaving(false);
+        return;
+      }
+    }
+
+    setSaving(false);
+    setDrawerOpen(false);
+    load();
   };
 
   const toggleActive = async (row) => {
@@ -269,6 +295,22 @@ export default function Team() {
         <label>Email</label>
         <input name="email" type="email" value={form.email} onChange={handleChange} placeholder="name@rushrepublic.in" />
         {fieldErrors.email && <div className="rr-drawer__error">{fieldErrors.email}</div>}
+
+        {isAdmin && editing && (
+          <div style={{ borderTop: '1px solid rgba(0,0,0,.1)', marginTop: 18, paddingTop: 16 }}>
+            <label>Reset Password</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Leave blank to keep the current password"
+              autoComplete="new-password"
+            />
+            <div style={{ fontSize: 12, color: 'rgba(0,0,0,.5)', marginTop: 4 }}>
+              Admin only. Sets this team member's login password immediately — they'll need to use it on their next login.
+            </div>
+          </div>
+        )}
       </Drawer>
     </AppShell>
   );
