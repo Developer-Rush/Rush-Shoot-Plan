@@ -341,7 +341,6 @@ export default function StepReels({ plan, onChanged, isElevated }) {
     }
   };
   const patch = (id, payload) => run(() => reelService.patch(id, payload), 'Could not save changes.');
-  const remove = (id) => run(() => reelService.remove(id), 'Could not remove reel.');
   const addScene = (reel) =>
     run(
       () => reelSceneService.create({ reel: reel.id, order: (reel.scenes || []).length, content: '' }),
@@ -488,6 +487,7 @@ export default function StepReels({ plan, onChanged, isElevated }) {
   // deletes the record itself, not just this reel's assignment, since it may
   // be assigned elsewhere too. That's destructive, so it goes through a
   // confirmation instead of removing outright.
+  const requestRemoveReel = (r) => setConfirmTarget({ kind: 'reel', id: r.id });
   const requestRemoveModel = (m) => setConfirmTarget({ kind: 'model', id: m.id, name: m.name });
   const requestRemoveFreelancer = (f) => setConfirmTarget({ kind: 'freelancer', id: f.id, name: f.name });
   const requestRemoveLocation = (loc) => setConfirmTarget({ kind: 'location', id: loc.id, name: loc.name });
@@ -502,7 +502,8 @@ export default function StepReels({ plan, onChanged, isElevated }) {
     if (!confirmTarget) return;
     const { kind, id } = confirmTarget;
     setConfirmTarget(null);
-    if (kind === 'model') run(() => planModelService.remove(id), 'Could not remove model.');
+    if (kind === 'reel') run(() => reelService.remove(id), 'Could not remove reel.');
+    else if (kind === 'model') run(() => planModelService.remove(id), 'Could not remove model.');
     else if (kind === 'freelancer') run(() => crewService.remove(id), 'Could not remove freelancer.');
     else if (kind === 'location') run(() => planLocationService.remove(id), 'Could not remove location.');
     else if (kind === 'scene') run(() => reelSceneService.remove(id), 'Could not delete scene.');
@@ -562,7 +563,7 @@ export default function StepReels({ plan, onChanged, isElevated }) {
             onMoveUp={() => move(r.id, -1)}
             onMoveDown={() => move(r.id, 1)}
             onDuplicate={() => duplicate(r)}
-            onRemove={() => remove(r.id)}
+            onRemove={() => requestRemoveReel(r)}
           >
             <ApprovalPanel
               entity={r}
@@ -977,14 +978,16 @@ export default function StepReels({ plan, onChanged, isElevated }) {
             <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginBottom: 14 }}>
               {confirmTarget.kind === 'scene'
                 ? `Are you sure you want to delete Scene ${confirmTarget.sceneNumber}? This cannot be undone.`
+                : confirmTarget.kind === 'reel'
+                ? 'Are you sure want to delete this Reel.'
                 : 'This entry has information and may be assigned elsewhere. Removing it will delete it everywhere it is used.'}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button type="button" onClick={cancelConfirm} style={{ border: '1px solid rgba(0,0,0,.2)', background: '#fff', borderRadius: 6, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                Cancel
+                {confirmTarget.kind === 'reel' ? 'No' : 'Cancel'}
               </button>
               <button type="button" onClick={confirmRemove} style={{ border: 'none', background: '#ff615f', color: '#fff', borderRadius: 6, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                {confirmTarget.kind === 'scene' ? 'Delete Scene' : 'Remove'}
+                {confirmTarget.kind === 'scene' ? 'Delete Scene' : confirmTarget.kind === 'reel' ? 'Yes' : 'Remove'}
               </button>
             </div>
           </div>

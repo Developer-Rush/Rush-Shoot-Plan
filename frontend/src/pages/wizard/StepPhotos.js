@@ -433,7 +433,6 @@ export default function StepPhotos({ plan, onChanged, isElevated }) {
     run(() => photoReferenceLinkService.patch(linkId, { url }), 'Could not update reference link.');
   const removeReferenceLink = (linkId) =>
     run(() => photoReferenceLinkService.remove(linkId), 'Could not remove reference link.');
-  const remove = (id) => run(() => photoService.remove(id), 'Could not remove shot.');
   const submitShot = (id, wasReturned) =>
     run(
       () => photoService.submit(id),
@@ -565,6 +564,7 @@ export default function StepPhotos({ plan, onChanged, isElevated }) {
   const patchFreelancerRole = (assignmentId, role) =>
     run(() => photoFreelancerRoleService.patch(assignmentId, { role }), 'Could not save role.');
 
+  const requestRemoveShot = (p) => setConfirmTarget({ kind: 'shot', id: p.id });
   const requestRemoveModel = (m) => setConfirmTarget({ kind: 'model', id: m.id, name: m.name });
   const requestRemoveFreelancer = (f) => setConfirmTarget({ kind: 'freelancer', id: f.id, name: f.name });
   const requestRemoveLocation = (loc) => setConfirmTarget({ kind: 'location', id: loc.id, name: loc.name });
@@ -574,7 +574,8 @@ export default function StepPhotos({ plan, onChanged, isElevated }) {
     if (!confirmTarget) return;
     const { kind, id } = confirmTarget;
     setConfirmTarget(null);
-    if (kind === 'model') run(() => planModelService.remove(id), 'Could not remove model.');
+    if (kind === 'shot') run(() => photoService.remove(id), 'Could not remove shot.');
+    else if (kind === 'model') run(() => planModelService.remove(id), 'Could not remove model.');
     else if (kind === 'freelancer') run(() => crewService.remove(id), 'Could not remove freelancer.');
     else if (kind === 'location') run(() => planLocationService.remove(id), 'Could not remove location.');
     else run(() => propService.remove(id), 'Could not remove prop.');
@@ -633,7 +634,7 @@ export default function StepPhotos({ plan, onChanged, isElevated }) {
             onMoveUp={() => move(p.id, -1)}
             onMoveDown={() => move(p.id, 1)}
             onDuplicate={() => duplicate(p)}
-            onRemove={() => remove(p.id)}
+            onRemove={() => requestRemoveShot(p)}
           >
             <ApprovalPanel
               entity={p}
@@ -972,14 +973,16 @@ export default function StepPhotos({ plan, onChanged, isElevated }) {
           <div style={{ background: '#fff', borderRadius: 8, padding: 22, width: 340 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>Confirm action</div>
             <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginBottom: 14 }}>
-              This entry has information and may be assigned elsewhere. Removing it will delete it everywhere it is used.
+              {confirmTarget.kind === 'shot'
+                ? 'Are you sure want to delete this Shot.'
+                : 'This entry has information and may be assigned elsewhere. Removing it will delete it everywhere it is used.'}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button type="button" onClick={cancelConfirm} style={{ border: '1px solid rgba(0,0,0,.2)', background: '#fff', borderRadius: 6, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                Cancel
+                {confirmTarget.kind === 'shot' ? 'No' : 'Cancel'}
               </button>
               <button type="button" onClick={confirmRemove} style={{ border: 'none', background: '#ff615f', color: '#fff', borderRadius: 6, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                Remove
+                {confirmTarget.kind === 'shot' ? 'Yes' : 'Remove'}
               </button>
             </div>
           </div>
