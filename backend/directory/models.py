@@ -92,7 +92,7 @@ class ModelProfile(models.Model):
     name = models.CharField(max_length=150)
     mobile = models.CharField(max_length=20)
     email = models.EmailField(blank=True)
-    age = models.PositiveSmallIntegerField(validators=[MinValueValidator(18), MaxValueValidator(80)])
+    age = models.PositiveSmallIntegerField(validators=[MinValueValidator(0), MaxValueValidator(110)])
     gender = models.CharField(max_length=10, choices=ModelGender.choices, default=ModelGender.OTHER)
     height_cm = models.PositiveSmallIntegerField(null=True, blank=True)
     weight_kg = models.PositiveSmallIntegerField(null=True, blank=True)

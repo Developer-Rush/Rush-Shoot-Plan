@@ -329,7 +329,7 @@ export default function Models() {
             <label>
               Age <span className="rr-drawer__required">*</span>
             </label>
-            <input name="age" type="number" min={18} max={80} value={form.age} onChange={handleChange} />
+            <input name="age" type="number" min={0} max={110} value={form.age} onChange={handleChange} />
             {fieldErrors.age && <div className="rr-drawer__error">{fieldErrors.age}</div>}
           </div>
           <div>
